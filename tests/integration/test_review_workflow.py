@@ -1,9 +1,19 @@
+from pathlib import Path
+
 from packages.agents.runner import WorkflowRunner
 from packages.core.checkpoint import WorkflowCheckpoint
 from packages.core.review_service import ReviewService
 from packages.db.database import SessionLocal
 from packages.db.repositories.reviews import ReviewRepository
 from packages.db.repositories.runs import RunRepository
+
+
+FIXTURE_DOCUMENT = (
+    Path(__file__).parents[1]
+    / "fixtures"
+    / "documents"
+    / "contract.pdf"
+)
 
 
 def approve_all_pending_findings(
@@ -42,7 +52,7 @@ def test_workflow_stops_at_review_gate():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/review-gate.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
         run_id = run.id
 
@@ -50,6 +60,13 @@ def test_workflow_stops_at_review_gate():
 
     assert state["status"] == "awaiting_review"
     assert state["current_stage"] == "review"
+
+    assert state["document_id"] is not None
+    assert state["extracted_text"] is not None
+
+    assert "SUPERDOCS TEST CONTRACT" in state["extracted_text"]
+    assert "Payment is due within 30 days." in state["extracted_text"]
+
     assert state["findings"]
 
     assert all(
@@ -67,13 +84,17 @@ def test_approved_review_allows_workflow_to_complete():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/approval.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
         run_id = run.id
 
     state = runner.run(run_id)
 
     assert state["status"] == "awaiting_review"
+    assert state["current_stage"] == "review"
+
+    assert state["document_id"] is not None
+    assert state["extracted_text"] is not None
 
     approve_all_pending_findings(
         run_id,

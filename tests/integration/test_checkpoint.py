@@ -19,6 +19,7 @@ def test_workflow_state_can_be_checkpointed_and_restored():
             "document_path": "/documents/checkpoint.pdf",
             "status": "running",
             "current_stage": "extract_text",
+            "document_id": None,
             "extracted_text": "persisted text",
             "findings": [],
             "stages": {

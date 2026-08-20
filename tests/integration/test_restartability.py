@@ -1,14 +1,22 @@
+from pathlib import Path
+from multiprocessing import Process
+import os
+import signal
+
 from packages.agents.graphs.adapter import invoke_workflow_graph
-from packages.agents.workflow import build_stage_graph
 from packages.agents.runner import WorkflowRunner
+from packages.agents.workflow import build_stage_graph
 from packages.core.checkpoint import WorkflowCheckpoint
 from packages.db.database import SessionLocal
 from packages.db.repositories.runs import RunRepository
-from typing import cast
-from packages.core.state import WorkflowState
-import os
-import signal
-from multiprocessing import Process
+
+
+FIXTURE_DOCUMENT = (
+    Path(__file__).parents[1]
+    / "fixtures"
+    / "documents"
+    / "contract.pdf"
+)
 
 
 def test_workflow_resumes_from_durable_checkpoint():
@@ -21,7 +29,7 @@ def test_workflow_resumes_from_durable_checkpoint():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/restart.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
 
         state = checkpoint.restore(run)
@@ -33,10 +41,16 @@ def test_workflow_resumes_from_durable_checkpoint():
             state,
         )
 
-        graph = build_stage_graph("extract_text")
+        graph = build_stage_graph(
+            "extract_text",
+            session=session,
+        )
 
-        state = invoke_workflow_graph(graph, state)
-        
+        state = invoke_workflow_graph(
+            graph,
+            state,
+        )
+
         state["current_stage"] = "analyze"
 
         run = checkpoint.save(
@@ -48,7 +62,20 @@ def test_workflow_resumes_from_durable_checkpoint():
         run_id = run.id
 
         assert run.current_stage == "analyze"
-        assert run.state["extracted_text"] == "Dummy extracted text"
+
+        assert run.state["document_id"] is not None
+        assert run.state["extracted_text"] is not None
+
+        assert (
+            "SUPERDOCS TEST CONTRACT"
+            in run.state["extracted_text"]
+        )
+
+        assert (
+            "Payment is due within 30 days."
+            in run.state["extracted_text"]
+        )
+
         assert (
             run.state["stages"]["extract_text"]["status"]
             == "completed"
@@ -68,8 +95,17 @@ def test_workflow_resumes_from_durable_checkpoint():
     assert final_state["status"] == "awaiting_review"
     assert final_state["current_stage"] == "review"
 
-    assert final_state["extracted_text"] == (
-        "Dummy extracted text"
+    assert final_state["document_id"] is not None
+    assert final_state["extracted_text"] is not None
+
+    assert (
+        "SUPERDOCS TEST CONTRACT"
+        in final_state["extracted_text"]
+    )
+
+    assert (
+        "Payment is due within 30 days."
+        in final_state["extracted_text"]
     )
 
     assert final_state["findings"]
@@ -93,6 +129,7 @@ def test_workflow_resumes_from_durable_checkpoint():
             == "completed"
         )
 
+
 def test_resume_does_not_reexecute_completed_stage():
     repository = RunRepository()
     checkpoint = WorkflowCheckpoint(repository)
@@ -103,7 +140,7 @@ def test_resume_does_not_reexecute_completed_stage():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/no-replay.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
 
         state = checkpoint.restore(run)
@@ -115,21 +152,28 @@ def test_resume_does_not_reexecute_completed_stage():
             state,
         )
 
-        graph = build_stage_graph("extract_text")
+        graph = build_stage_graph(
+            "extract_text",
+            session=session,
+        )
 
-        state = invoke_workflow_graph(graph, state)
+        state = invoke_workflow_graph(
+            graph,
+            state,
+        )
 
         state["current_stage"] = "analyze"
 
         run = checkpoint.save(
             session,
             run,
-            state, 
+            state,
         )
 
         run_id = run.id
 
         assert run.current_stage == "analyze"
+
         assert (
             run.state["stages"]["extract_text"]["status"]
             == "completed"
@@ -138,13 +182,19 @@ def test_resume_does_not_reexecute_completed_stage():
     # ---------------------------------------------------------
     # Worker 2: fail immediately if extract_text is attempted.
     # ---------------------------------------------------------
-    def resume_graph_factory(stage: str):
+    def resume_graph_factory(
+        stage: str,
+        **kwargs,
+    ):
         if stage == "extract_text":
             raise AssertionError(
                 "Completed extract_text stage was re-executed"
             )
 
-        return build_stage_graph(stage)
+        return build_stage_graph(
+            stage,
+            **kwargs,
+        )
 
     runner = WorkflowRunner(
         repository=repository,
@@ -157,6 +207,7 @@ def test_resume_does_not_reexecute_completed_stage():
     assert final_state["current_stage"] == "review"
     assert final_state["findings"]
 
+
 def _worker_checkpoint_then_die(run_id):
     repository = RunRepository()
     checkpoint = WorkflowCheckpoint(repository)
@@ -165,7 +216,9 @@ def _worker_checkpoint_then_die(run_id):
         run = repository.get(session, run_id)
 
         if run is None:
-            raise RuntimeError(f"Run {run_id} not found")
+            raise RuntimeError(
+                f"Run {run_id} not found"
+            )
 
         state = checkpoint.restore(run)
         state["status"] = "running"
@@ -176,9 +229,15 @@ def _worker_checkpoint_then_die(run_id):
             state,
         )
 
-        graph = build_stage_graph("extract_text")
+        graph = build_stage_graph(
+            "extract_text",
+            session=session,
+        )
 
-        state = graph.invoke(state)
+        state = invoke_workflow_graph(
+            graph,
+            state,
+        )
 
         state["current_stage"] = "analyze"
 
@@ -189,7 +248,11 @@ def _worker_checkpoint_then_die(run_id):
         )
 
     # Simulate an actual worker/process crash.
-    os.kill(os.getpid(), signal.SIGKILL)
+    os.kill(
+        os.getpid(),
+        signal.SIGKILL,
+    )
+
 
 def test_real_process_restart_resumes_from_durable_checkpoint():
     repository = RunRepository()
@@ -200,7 +263,7 @@ def test_real_process_restart_resumes_from_durable_checkpoint():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/process-kill.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
 
         run_id = run.id
@@ -223,19 +286,30 @@ def test_real_process_restart_resumes_from_durable_checkpoint():
     # Verify the checkpoint survived the process death.
     # ---------------------------------------------------------
     with SessionLocal() as session:
-        persisted_run = repository.get(session, run_id)
+        persisted_run = repository.get(
+            session,
+            run_id,
+        )
 
         assert persisted_run is not None
         assert persisted_run.current_stage == "analyze"
 
+        assert persisted_run.state["document_id"] is not None
+        assert persisted_run.state["extracted_text"] is not None
+
         assert (
-            persisted_run.state["stages"]["extract_text"]["status"]
-            == "completed"
+            "SUPERDOCS TEST CONTRACT"
+            in persisted_run.state["extracted_text"]
         )
 
         assert (
-            persisted_run.state["extracted_text"]
-            == "Dummy extracted text"
+            "Payment is due within 30 days."
+            in persisted_run.state["extracted_text"]
+        )
+
+        assert (
+            persisted_run.state["stages"]["extract_text"]["status"]
+            == "completed"
         )
 
     # ---------------------------------------------------------
@@ -255,7 +329,10 @@ def test_real_process_restart_resumes_from_durable_checkpoint():
     # Verify final durable state.
     # ---------------------------------------------------------
     with SessionLocal() as session:
-        final_run = repository.get(session, run_id)
+        final_run = repository.get(
+            session,
+            run_id,
+        )
 
         assert final_run is not None
         assert final_run.status == "awaiting_review"

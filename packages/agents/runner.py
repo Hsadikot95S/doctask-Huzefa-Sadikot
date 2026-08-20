@@ -1,19 +1,20 @@
 from collections.abc import Callable
 from uuid import UUID
 
+from packages.agents.graphs.adapter import invoke_workflow_graph
 from packages.agents.workflow import build_stage_graph
 from packages.core.checkpoint import WorkflowCheckpoint
 from packages.core.state import WorkflowState
 from packages.db.database import SessionLocal
 from packages.db.repositories.runs import RunRepository
-from packages.agents.graphs.adapter import invoke_workflow_graph
+
 
 class WorkflowRunner:
     def __init__(
         self,
         repository: RunRepository | None = None,
         checkpoint: WorkflowCheckpoint | None = None,
-        graph_factory: Callable[[str], object] | None = None,
+        graph_factory: Callable[..., object] | None = None,
     ):
         self.repository = repository or RunRepository()
         self.checkpoint = checkpoint or WorkflowCheckpoint(
@@ -49,8 +50,15 @@ class WorkflowRunner:
                     stage = state["current_stage"]
 
                     if stage == "extract_text":
-                        graph = self.graph_factory("extract_text")
-                        state = invoke_workflow_graph(graph, state)
+                        graph = self.graph_factory(
+                            "extract_text",
+                            session=session,
+                        )
+
+                        state = invoke_workflow_graph(
+                            graph,
+                            state,
+                        )
 
                         state["current_stage"] = "analyze"
 
@@ -63,8 +71,15 @@ class WorkflowRunner:
                         continue
 
                     if stage == "analyze":
-                        graph = self.graph_factory("analyze")
-                        state = invoke_workflow_graph(graph, state)
+                        graph = self.graph_factory(
+                            "analyze",
+                            session=session,
+                        )
+
+                        state = invoke_workflow_graph(
+                            graph,
+                            state,
+                        )
 
                         # Analysis produces proposed findings.
                         # The workflow must now stop for human review.
@@ -83,6 +98,7 @@ class WorkflowRunner:
                         # Do not automatically approve anything.
                         # A human or machine must explicitly decide
                         # every finding through ReviewService.
+
                         pending_findings = [
                             finding
                             for finding in state["findings"]

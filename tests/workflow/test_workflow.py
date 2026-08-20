@@ -1,41 +1,67 @@
-from packages.agents.workflow import build_graph
+from pathlib import Path
 from typing import cast
 
-from packages.core.state import WorkflowState
-
 from packages.agents.runner import WorkflowRunner
+from packages.agents.workflow import build_graph, build_stage_graph
 from packages.core.checkpoint import WorkflowCheckpoint
 from packages.core.review_service import ReviewService
+from packages.core.state import WorkflowState
 from packages.db.database import SessionLocal
 from packages.db.repositories.reviews import ReviewRepository
 from packages.db.repositories.runs import RunRepository
-from packages.agents.workflow import build_stage_graph
-from packages.core.state import WorkflowState
+
+
+FIXTURE_DOCUMENT = (
+    Path(__file__).parents[1]
+    / "fixtures"
+    / "documents"
+    / "contract.pdf"
+)
 
 
 def test_workflow_builds_and_invokes():
-    graph = build_graph()
     initial_state = cast(
-    WorkflowState,
-    {
-        "run_id": "test-run",
-        "document_path": "/tmp/test.pdf",
-        "status": "pending",
-        "current_stage": "extract_text",
-        "extracted_text": None,
-        "findings": [],
-        "stages": {},
-        "error": None,
-    },
-)
-    
-    result = graph.invoke(initial_state)
+        WorkflowState,
+        {
+            "run_id": "test-run",
+            "document_path": str(FIXTURE_DOCUMENT),
+            "status": "pending",
+            "current_stage": "extract_text",
+            "document_id": None,
+            "extracted_text": None,
+            "findings": [],
+            "stages": {},
+            "error": None,
+        },
+    )
 
-    assert result["extracted_text"] == "Dummy extracted text"
+    with SessionLocal() as session:
+        graph = build_graph(session=session)
+
+        result = graph.invoke(initial_state)
+
+        session.commit()
+
+    assert result["document_id"] is not None
+    assert result["extracted_text"] is not None
+
+    assert "SUPERDOCS TEST CONTRACT" in result["extracted_text"]
+    assert "Payment is due within 30 days." in result["extracted_text"]
+    assert "The agreement begins on January 1, 2027." in result["extracted_text"]
+    assert "The agreement expires on December 31, 2027." in result["extracted_text"]
+
     assert len(result["findings"]) == 1
     assert result["findings"][0]["status"] == "pending"
-    assert result["stages"]["extract_text"]["status"] == "completed"
-    assert result["stages"]["analyze"]["status"] == "completed"
+
+    assert (
+        result["stages"]["extract_text"]["status"]
+        == "completed"
+    )
+
+    assert (
+        result["stages"]["analyze"]["status"]
+        == "completed"
+    )
 
 
 def test_workflow_stops_at_review_gate():
@@ -45,7 +71,7 @@ def test_workflow_stops_at_review_gate():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/review-gate.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
 
         run_id = run.id
@@ -69,6 +95,9 @@ def test_workflow_stops_at_review_gate():
         assert persisted_run.status == "awaiting_review"
         assert persisted_run.current_stage == "review"
 
+        assert persisted_run.state["document_id"] is not None
+        assert persisted_run.state["extracted_text"] is not None
+
         assert (
             persisted_run.state["stages"]["extract_text"]["status"]
             == "completed"
@@ -78,6 +107,7 @@ def test_workflow_stops_at_review_gate():
             persisted_run.state["stages"]["analyze"]["status"]
             == "completed"
         )
+
 
 def test_approval_allows_workflow_to_complete():
     repository = RunRepository()
@@ -89,7 +119,7 @@ def test_approval_allows_workflow_to_complete():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/approval.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
 
         run_id = run.id
@@ -131,10 +161,15 @@ def test_approval_allows_workflow_to_complete():
     assert final_state["findings"][0]["status"] == "approved"
 
 
-
-def two_finding_graph_factory(stage: str):
+def two_finding_graph_factory(
+    stage: str,
+    **kwargs,
+):
     if stage != "analyze":
-        return build_stage_graph(stage)
+        return build_stage_graph(
+            stage,
+            **kwargs,
+        )
 
     class TwoFindingGraph:
         def invoke(self, state: WorkflowState) -> WorkflowState:
@@ -162,6 +197,7 @@ def two_finding_graph_factory(stage: str):
 
     return TwoFindingGraph()
 
+
 def test_mixed_review_decisions_are_preserved():
     repository = RunRepository()
     checkpoint = WorkflowCheckpoint(repository)
@@ -175,7 +211,7 @@ def test_mixed_review_decisions_are_preserved():
     with SessionLocal() as session:
         run = repository.create(
             session,
-            document_path="/documents/mixed-review.pdf",
+            document_path=str(FIXTURE_DOCUMENT),
         )
 
         run_id = run.id

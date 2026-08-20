@@ -46,6 +46,18 @@ class AnalysisRun(Base):
         nullable=True,
     )
 
+    # Worker ownership / lease.
+    # A worker must periodically renew this lease while processing.
+    worker_id: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+    )
+
+    lease_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     # Used later for optimistic concurrency control.
     version: Mapped[int] = mapped_column(
         Integer,

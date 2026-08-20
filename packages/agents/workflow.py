@@ -1,18 +1,38 @@
-from langgraph.graph import END, StateGraph
-
-from packages.core.state import WorkflowState
-
 from typing import Any
 
-def extract_text(state: WorkflowState) -> WorkflowState:
-    state["extracted_text"] = "Dummy extracted text"
-    state["current_stage"] = "extract_text"
-    state["stages"]["extract_text"] = {
-        "status": "completed",
-        "error": None,
-    }
+from langgraph.graph import END, StateGraph
+from sqlalchemy.orm import Session
 
-    return state
+from packages.core.state import WorkflowState
+from packages.documents.service import DocumentService
+
+
+def make_extract_text_node(
+    session: Session,
+    document_service: DocumentService,
+):
+    def extract_text(state: WorkflowState) -> WorkflowState:
+        document, pages = document_service.ingest(
+            session,
+            state["document_path"],
+        )
+
+        state["document_id"] = document.document_id
+
+        state["extracted_text"] = "\n".join(
+            page.text
+            for page in pages
+        )
+
+        state["current_stage"] = "extract_text"
+        state["stages"]["extract_text"] = {
+            "status": "completed",
+            "error": None,
+        }
+
+        return state
+
+    return extract_text
 
 
 def analyze(state: WorkflowState) -> WorkflowState:
@@ -34,10 +54,26 @@ def analyze(state: WorkflowState) -> WorkflowState:
     return state
 
 
-def build_graph() -> Any:
+def build_graph(
+    *,
+    session: Session | None = None,
+    document_service: DocumentService | None = None,
+) -> Any:
     graph = StateGraph(WorkflowState)
 
-    graph.add_node("extract_text", extract_text)
+    if session is None:
+        raise ValueError(
+            "A database session is required to build the workflow"
+        )
+
+    graph.add_node(
+        "extract_text",
+        make_extract_text_node(
+            session,
+            document_service or DocumentService(),
+        ),
+    )
+
     graph.add_node("analyze", analyze)
 
     graph.set_entry_point("extract_text")
@@ -46,11 +82,29 @@ def build_graph() -> Any:
 
     return graph.compile()
 
-def build_stage_graph(stage: str) -> Any:
+
+def build_stage_graph(
+    stage: str,
+    *,
+    session: Session | None = None,
+    document_service: DocumentService | None = None,
+) -> Any:
     graph = StateGraph(WorkflowState)
 
     if stage == "extract_text":
-        graph.add_node("extract_text", extract_text)
+        if session is None:
+            raise ValueError(
+                "A database session is required for extract_text"
+            )
+
+        graph.add_node(
+            "extract_text",
+            make_extract_text_node(
+                session,
+                document_service or DocumentService(),
+            ),
+        )
+
         graph.set_entry_point("extract_text")
         graph.add_edge("extract_text", END)
 
@@ -60,6 +114,8 @@ def build_stage_graph(stage: str) -> Any:
         graph.add_edge("analyze", END)
 
     else:
-        raise ValueError(f"Unsupported workflow stage: {stage}")
+        raise ValueError(
+            f"Unsupported workflow stage: {stage}"
+        )
 
     return graph.compile()

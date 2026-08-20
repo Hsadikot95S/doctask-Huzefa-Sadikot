@@ -9,7 +9,6 @@ StageName = Literal[
     "failed",
 ]
 
-
 RunStatus = Literal[
     "pending",
     "running",
@@ -18,12 +17,12 @@ RunStatus = Literal[
     "failed",
 ]
 
-
 FindingStatus = Literal[
     "pending",
     "approved",
     "rejected",
 ]
+
 
 class Finding(TypedDict):
     finding_id: str
@@ -47,6 +46,7 @@ class WorkflowState(TypedDict):
     current_stage: StageName
 
     # Document processing
+    document_id: Optional[str]
     extracted_text: Optional[str]
 
     # Analysis

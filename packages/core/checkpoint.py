@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from sqlalchemy.orm import Session
 
 from packages.core.state import WorkflowState
@@ -25,12 +23,13 @@ class WorkflowCheckpoint:
             state={
                 "findings": state["findings"],
                 "stages": state["stages"],
+                "document_id": state["document_id"],
                 "extracted_text": state["extracted_text"],
             },
             status=state["status"],
             current_stage=state["current_stage"],
             error=state["error"],
-            commit = commit,
+            commit=commit,
         )
 
     def restore(
@@ -44,8 +43,9 @@ class WorkflowCheckpoint:
             document_path=run.document_path,
             status=run.status,
             current_stage=run.current_stage,
+            document_id=state.get("document_id"),
             extracted_text=state.get("extracted_text"),
             findings=state.get("findings", []),
             stages=state.get("stages", {}),
             error=run.error,
-        ) # type: ignore
+        )  # type: ignore

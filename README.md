@@ -44,3 +44,31 @@ The machine-driven API, evidence grounding, security hardening, telemetry, and f
                        │
                        ▼
                    PostgreSQL
+
+
+Step 2 — Durable Document Processing
+------------------------------------
+Status: Complete
+
+API
+  POST /documents
+
+Persistence
+  PostgreSQL
+  documents
+  document_pages
+  analysis_runs
+  review_decisions
+
+Worker
+  atomic job claiming
+  worker ownership
+  leases
+  heartbeat
+  restartability
+
+Workflow
+  extract_text
+  analyze
+  review
+  complete
