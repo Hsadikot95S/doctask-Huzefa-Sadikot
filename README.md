@@ -48,8 +48,6 @@ The machine-driven API, evidence grounding, security hardening, telemetry, and f
 
 Step 2 — Durable Document Processing
 ------------------------------------
-Status: Complete
-
 API
   POST /documents
 

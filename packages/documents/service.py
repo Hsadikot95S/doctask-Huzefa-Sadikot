@@ -35,6 +35,8 @@ class DocumentService:
         self,
         session: Session,
         path: Path,
+        *,
+        filename: str | None =None
     ) -> tuple[Document, list[DocumentPage]]:
         path = Path(path)
 
@@ -79,7 +81,7 @@ class DocumentService:
 
         document = Document(
             document_id=str(document_id),
-            filename=path.name,
+            filename=filename or path.name,
             content_hash=content_hash,
             mime_type=self._detect_mime_type(path),
             size_bytes=len(content),

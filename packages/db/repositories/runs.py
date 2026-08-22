@@ -16,6 +16,8 @@ class RunRepository:
         self,
         session: Session,
         document_path: str,
+        *,
+        commit:bool = True
     ) -> AnalysisRun:
         run = AnalysisRun(
             document_path=document_path,
@@ -23,6 +25,8 @@ class RunRepository:
                 "findings": [],
                 "stages": {},
                 "document_id": None,
+                "update_id": None,
+                "target_run_id": None,
                 "extracted_text": None,
             },
             created_at=datetime.now(timezone.utc),
@@ -30,8 +34,11 @@ class RunRepository:
         )
 
         session.add(run)
-        session.commit()
-        session.refresh(run)
+        session.flush()
+
+        if commit:
+            session.commit()
+            session.refresh(run)
 
         return run
 
@@ -304,3 +311,5 @@ class RunRepository:
         session.refresh(updated_run)
 
         return updated_run
+
+    

@@ -41,9 +41,12 @@ class WorkflowState(TypedDict):
     run_id: str
     document_path: str
 
-    # Run lifecycle
     status: RunStatus
     current_stage: StageName
+
+    # Update context
+    update_id: Optional[str]
+    target_run_id: Optional[str]
 
     # Document processing
     document_id: Optional[str]

@@ -24,10 +24,12 @@ class WorkflowCheckpoint:
                 "findings": state["findings"],
                 "stages": state["stages"],
                 "document_id": state["document_id"],
+                "update_id": state.get("update_id"),
+                "target_run_id": state.get("target_run_id"),
                 "extracted_text": state["extracted_text"],
             },
-            status=state["status"],
-            current_stage=state["current_stage"],
+            status=state["status"], # pyright: ignore[reportGeneralTypeIssues]
+            current_stage=state["current_stage"], # pyright: ignore[reportGeneralTypeIssues]
             error=state["error"],
             commit=commit,
         )
@@ -41,9 +43,10 @@ class WorkflowCheckpoint:
         return WorkflowState(
             run_id=str(run.id),
             document_path=run.document_path,
-            status=run.status,
-            current_stage=run.current_stage,
+            status=run.status, # type: ignore
+            current_stage=run.current_stage, #type: ignore
             document_id=state.get("document_id"),
+            target_run_id = state.get("target_run_id"),
             extracted_text=state.get("extracted_text"),
             findings=state.get("findings", []),
             stages=state.get("stages", {}),

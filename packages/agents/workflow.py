@@ -14,7 +14,7 @@ def make_extract_text_node(
     def extract_text(state: WorkflowState) -> WorkflowState:
         document, pages = document_service.ingest(
             session,
-            state["document_path"],
+            state["document_path"], # type: ignore
         )
 
         state["document_id"] = document.document_id
