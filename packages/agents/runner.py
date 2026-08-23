@@ -49,9 +49,18 @@ class WorkflowRunner:
                 while True:
                     stage = state["current_stage"]
 
+                    # -------------------------------------------------
+                    # Extraction
+                    # -------------------------------------------------
                     if stage == "extract_text":
+                        graph_stage = (
+                            "incremental_extract_text"
+                            if state.get("update_id")
+                            else "extract_text"
+                        )
+
                         graph = self.graph_factory(
-                            "extract_text",
+                            graph_stage,
                             session=session,
                         )
 
@@ -70,9 +79,18 @@ class WorkflowRunner:
 
                         continue
 
+                    # -------------------------------------------------
+                    # Analysis
+                    # -------------------------------------------------
                     if stage == "analyze":
+                        graph_stage = (
+                            "incremental_analyze"
+                            if state.get("update_id")
+                            else "analyze"
+                        )
+
                         graph = self.graph_factory(
-                            "analyze",
+                            graph_stage,
                             session=session,
                         )
 
@@ -82,7 +100,7 @@ class WorkflowRunner:
                         )
 
                         # Analysis produces proposed findings.
-                        # The workflow must now stop for human review.
+                        # The workflow stops for human review.
                         state["current_stage"] = "review"
                         state["status"] = "awaiting_review"
 
@@ -94,6 +112,9 @@ class WorkflowRunner:
 
                         return state
 
+                    # -------------------------------------------------
+                    # Human review boundary
+                    # -------------------------------------------------
                     if stage == "review":
                         # Do not automatically approve anything.
                         # A human or machine must explicitly decide
@@ -107,6 +128,12 @@ class WorkflowRunner:
 
                         if pending_findings:
                             state["status"] = "awaiting_review"
+
+                            run = self.checkpoint.save(
+                                session,
+                                run,
+                                state,
+                            )
 
                             return state
 
@@ -122,8 +149,18 @@ class WorkflowRunner:
 
                         return state
 
+                    # -------------------------------------------------
+                    # Completed
+                    # -------------------------------------------------
                     if stage == "complete":
                         state["status"] = "completed"
+
+                        run = self.checkpoint.save(
+                            session,
+                            run,
+                            state,
+                        )
+
                         return state
 
                     raise ValueError(

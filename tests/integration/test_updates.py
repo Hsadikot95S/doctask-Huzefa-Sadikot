@@ -12,6 +12,10 @@ from sqlalchemy.exc import IntegrityError
 
 from packages.documents.application import DocumentApplicationService
 
+from packages.agents.runner import WorkflowRunner
+
+from tests.integration.test_restartability import FIXTURE_DOCUMENT
+
 
 def test_update_repository_persists_update():
     document_repository = DocumentRepository()
@@ -188,3 +192,198 @@ def test_create_incremental_update_creates_update_and_run():
         assert update_run.state["document_id"] == str(document_id)
         assert update_run.state["update_id"] == str(update.id)
         assert update_run.state["target_run_id"] == str(target_run_id)
+
+
+def test_incremental_update_run_executes():
+    application = DocumentApplicationService()
+    document_repository = DocumentRepository()
+    run_repository = RunRepository()
+    runner = WorkflowRunner()
+
+    with SessionLocal() as session:
+        # ---------------------------------------------------------
+        # Create the amendment/source document.
+        # ---------------------------------------------------------
+        document = document_repository.create(
+            session,
+            document_id=uuid4(),
+            filename="amendment.txt",
+            content_hash=uuid4().hex * 2,
+            mime_type="text/plain",
+            size_bytes=100,
+            storage_path=str(FIXTURE_DOCUMENT),
+        )
+
+        document_id = document.id
+
+        # ---------------------------------------------------------
+        # Create the existing analysis run that the update targets.
+        # ---------------------------------------------------------
+        target_run = run_repository.create(
+            session,
+            document_path=str(FIXTURE_DOCUMENT),
+        )
+
+        target_run_id = target_run.id
+
+    # -------------------------------------------------------------
+    # Create the incremental update and its dedicated run.
+    # -------------------------------------------------------------
+    with SessionLocal() as session:
+        update, update_run = application.create_incremental_update(
+            session,
+            source_document_id=document_id,
+            target_run_id=target_run_id,
+        )
+
+        update_run_id = update_run.id
+
+        assert update.id is not None
+        assert update_run_id is not None
+
+        assert update.source_document_id == document_id
+        assert update.target_run_id == target_run_id
+
+        assert update_run.state["document_id"] == str(document_id)
+        assert update_run.state["update_id"] == str(update.id)
+        assert update_run.state["target_run_id"] == str(target_run_id)
+
+    # -------------------------------------------------------------
+    # Execute the incremental run.
+    # -------------------------------------------------------------
+    final_state = runner.run(update_run_id)
+
+    # -------------------------------------------------------------
+    # The existing runner stops at the review boundary.
+    # -------------------------------------------------------------
+    assert final_state["document_id"] == str(document_id)
+    assert final_state["update_id"] == str(update.id)
+    assert final_state["target_run_id"] == str(target_run_id)
+
+    assert final_state["status"] == "awaiting_review"
+    assert final_state["current_stage"] == "review"
+
+    assert final_state["findings"]
+
+
+def test_incremental_update_preserves_existing_findings():
+    application = DocumentApplicationService()
+    document_repository = DocumentRepository()
+    run_repository = RunRepository()
+    runner = WorkflowRunner()
+
+    with SessionLocal() as session:
+        # ---------------------------------------------------------
+        # Create the amendment/source document.
+        # ---------------------------------------------------------
+        document = document_repository.create(
+            session,
+            document_id=uuid4(),
+            filename="amendment.txt",
+            content_hash=uuid4().hex * 2,
+            mime_type="text/plain",
+            size_bytes=100,
+            storage_path=str(FIXTURE_DOCUMENT),
+        )
+
+        document_id = document.id
+
+        # ---------------------------------------------------------
+        # Create the existing target analysis run.
+        # ---------------------------------------------------------
+        target_run = run_repository.create(
+            session,
+            document_path=str(FIXTURE_DOCUMENT),
+        )
+
+        # Persist the existing findings through the repository
+        # instead of mutating the JSONB column directly.
+        target_run = run_repository.update_state(
+            session,
+            target_run,
+            state={
+                **target_run.state,
+                "findings": [
+                    {
+                        "finding_id": "F-001",
+                        "description": "Existing approved finding",
+                        "status": "approved",
+                        "evidence": ["source.pdf:page=1"],
+                    },
+                    {
+                        "finding_id": "F-002",
+                        "description": "Existing rejected finding",
+                        "status": "rejected",
+                        "evidence": ["source.pdf:page=2"],
+                    },
+                ],
+            },
+            status=target_run.status,
+            current_stage=target_run.current_stage,
+            error=target_run.error,
+        )
+
+        target_run_id = target_run.id
+
+        # ---------------------------------------------------------
+        # Create the incremental update and dedicated run.
+        # ---------------------------------------------------------
+        update, update_run = (
+            application.create_incremental_update(
+                session,
+                source_document_id=document_id,
+                target_run_id=target_run_id,
+            )
+        )
+
+        update_run_id = update_run.id
+
+        # ---------------------------------------------------------
+        # Execute the incremental update.
+        # ---------------------------------------------------------
+        final_state = runner.run(update_run_id)
+
+        # ---------------------------------------------------------
+        # Existing findings must remain unchanged.
+        # ---------------------------------------------------------
+        findings = final_state["findings"]
+
+        finding_1 = next(
+            finding
+            for finding in findings
+            if finding["finding_id"] == "F-001"
+        )
+
+        finding_2 = next(
+            finding
+            for finding in findings
+            if finding["finding_id"] == "F-002"
+        )
+
+        assert finding_1["status"] == "approved"
+        assert finding_2["status"] == "rejected"
+
+        assert (
+            finding_1["description"]
+            == "Existing approved finding"
+        )
+
+        assert (
+            finding_2["description"]
+            == "Existing rejected finding"
+        )
+
+        # ---------------------------------------------------------
+        # Incremental analysis must add a new pending finding.
+        # ---------------------------------------------------------
+        new_findings = [
+            finding
+            for finding in findings
+            if finding["finding_id"].startswith("UPDATE-")
+        ]
+
+        assert len(new_findings) == 1
+
+        new_finding = new_findings[0]
+
+        assert new_finding["status"] == "pending"

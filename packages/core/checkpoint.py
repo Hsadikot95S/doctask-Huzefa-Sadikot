@@ -43,10 +43,11 @@ class WorkflowCheckpoint:
         return WorkflowState(
             run_id=str(run.id),
             document_path=run.document_path,
-            status=run.status, # type: ignore
-            current_stage=run.current_stage, #type: ignore
+            status=run.status,  # type: ignore
+            current_stage=run.current_stage,  # type: ignore
+            update_id=state.get("update_id"),
+            target_run_id=state.get("target_run_id"),
             document_id=state.get("document_id"),
-            target_run_id = state.get("target_run_id"),
             extracted_text=state.get("extracted_text"),
             findings=state.get("findings", []),
             stages=state.get("stages", {}),

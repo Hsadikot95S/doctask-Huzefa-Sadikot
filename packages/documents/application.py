@@ -159,6 +159,12 @@ class DocumentApplicationService:
                 f"Source document {source_document_id} not found"
             )
 
+        if not source_document .storage_path:
+            raise ValueError(
+                f"Source document {source_document_id} has no storage path"
+
+            )
+
         target_run = self.run_repository.get(
             session,
             target_run_id,
