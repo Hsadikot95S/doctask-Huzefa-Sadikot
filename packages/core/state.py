@@ -5,9 +5,12 @@ StageName = Literal[
     "extract_text",
     "analyze",
     "review",
+    "incremental_extract_text",
+    "incremental_analyze",
     "complete",
     "failed",
 ]
+
 
 RunStatus = Literal[
     "pending",
@@ -16,6 +19,7 @@ RunStatus = Literal[
     "completed",
     "failed",
 ]
+
 
 FindingStatus = Literal[
     "pending",
@@ -31,9 +35,39 @@ class Finding(TypedDict):
     evidence: List[str]
 
 
+class StageMetrics(TypedDict):
+    duration_ms: float
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+    estimated_cost: Optional[float]
+
+
 class StageResult(TypedDict):
-    status: Literal["pending", "running", "completed", "failed"]
+    status: Literal[
+        "pending",
+        "running",
+        "completed",
+        "failed",
+    ]
     error: Optional[str]
+    metrics: Optional[StageMetrics]
+
+
+class ModelUsage(TypedDict):
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+    estimated_cost: Optional[float]
+
+
+class Evidence(TypedDict):
+    document_id: str
+    page_number: int
+    text: str
+
+
+class AnalysisResult(TypedDict):
+    findings: List[Finding]
+    usage: ModelUsage
 
 
 class WorkflowState(TypedDict):
@@ -41,19 +75,22 @@ class WorkflowState(TypedDict):
     run_id: str
     document_path: str
 
-    status: RunStatus
-    current_stage: StageName
-
-    # Update context
+    # Document identity / lineage
+    document_id: Optional[str]
     update_id: Optional[str]
     target_run_id: Optional[str]
 
+    # Run lifecycle
+    status: RunStatus
+    current_stage: StageName
+
     # Document processing
-    document_id: Optional[str]
     extracted_text: Optional[str]
+    evidence: List[Evidence]
 
     # Analysis
     findings: List[Finding]
+    analysis_usage: Optional[ModelUsage]
 
     # Stage-level execution state
     stages: dict[str, StageResult]
