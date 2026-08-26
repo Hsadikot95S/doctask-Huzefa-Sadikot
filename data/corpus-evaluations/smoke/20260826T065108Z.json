@@ -1,0 +1,40 @@
+{
+  "suite": "smoke",
+  "purpose": "Fast parser/API sanity check covering one PDF, one DOCX and one TXT.",
+  "api_base_url": "http://127.0.0.1:8000",
+  "started_at": "2026-08-26T06:51:08.510917+00:00",
+  "documents_total": 3,
+  "documents_passed": 0,
+  "documents_failed": 3,
+  "results": [
+    {
+      "id": "DOC-002",
+      "filename": "documents/pdf/document_002_en_table.pdf",
+      "format": "pdf",
+      "language": "en",
+      "passed": false,
+      "error": "APIError: Cannot reach API at http://127.0.0.1:8000/documents: [Errno 61] Connection refused",
+      "completed_at": "2026-08-26T06:51:08.533209+00:00"
+    },
+    {
+      "id": "DOC-005",
+      "filename": "documents/docx/document_005_en_table.docx",
+      "format": "docx",
+      "language": "en",
+      "passed": false,
+      "error": "APIError: Cannot reach API at http://127.0.0.1:8000/documents: [Errno 61] Connection refused",
+      "completed_at": "2026-08-26T06:51:08.535388+00:00"
+    },
+    {
+      "id": "DOC-014",
+      "filename": "documents/txt/document_014_en.txt",
+      "format": "txt",
+      "language": "en",
+      "passed": false,
+      "error": "APIError: Cannot reach API at http://127.0.0.1:8000/documents: [Errno 61] Connection refused",
+      "completed_at": "2026-08-26T06:51:08.536913+00:00"
+    }
+  ],
+  "completed_at": "2026-08-26T06:51:08.536992+00:00",
+  "passed": false
+}

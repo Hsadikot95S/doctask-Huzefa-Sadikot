@@ -1,0 +1,12 @@
+{
+  "suite": "smoke",
+  "purpose": "Fast parser/API sanity check covering one PDF, one DOCX and one TXT.",
+  "api_base_url": "http://127.0.0.1:8000",
+  "started_at": "2026-08-26T06:52:11.732382+00:00",
+  "documents_total": 3,
+  "documents_passed": 3,
+  "documents_failed": 0,
+  "results": [],
+  "completed_at": "2026-08-26T06:52:12.146785+00:00",
+  "passed": true
+}

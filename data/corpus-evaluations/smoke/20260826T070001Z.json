@@ -1,0 +1,223 @@
+{
+  "suite": "smoke",
+  "purpose": "Fast parser/API sanity check covering one PDF, one DOCX and one TXT.",
+  "api_base_url": "http://127.0.0.1:8000",
+  "started_at": "2026-08-26T07:00:01.556561+00:00",
+  "documents_total": 3,
+  "documents_passed": 3,
+  "documents_failed": 0,
+  "results": [
+    {
+      "id": "DOC-002",
+      "filename": "documents/pdf/document_002_en_table.pdf",
+      "format": "pdf",
+      "language": "en",
+      "expected": {
+        "length_class": "medium",
+        "document_type": "report",
+        "structural_features": [
+          "headings",
+          "paragraphs",
+          "table",
+          "list"
+        ]
+      },
+      "started_at": "2026-08-26T07:00:01.557057+00:00",
+      "upload": {
+        "passed": true,
+        "document_id": "ae0671bc-949f-442e-8b4e-2f9fda645c7a",
+        "run_id": "e77ab3aa-6e53-45f4-bb7b-bec52e830a13",
+        "status": "pending"
+      },
+      "initial_run": {
+        "status": "pending",
+        "current_stage": "extract_text",
+        "error": null
+      },
+      "resume": {
+        "passed": true,
+        "status": "awaiting_review",
+        "current_stage": "review",
+        "error": null
+      },
+      "run": {
+        "passed": true,
+        "status": "awaiting_review",
+        "current_stage": "review",
+        "error": null,
+        "stages": {
+          "analyze": {
+            "status": "completed",
+            "error": null
+          },
+          "extract_text": {
+            "status": "completed",
+            "error": null
+          }
+        }
+      },
+      "findings": {
+        "passed": true,
+        "count": 1,
+        "items": [
+          {
+            "status": "pending",
+            "evidence": [
+              "sample.pdf:page=1"
+            ],
+            "finding_id": "F-001",
+            "description": "Sample finding"
+          }
+        ]
+      },
+      "review": {
+        "required": true,
+        "automated": false,
+        "note": "Findings were intentionally not auto-approved. Human review remains a separate workflow step."
+      },
+      "passed": true,
+      "completed_at": "2026-08-26T07:00:01.699145+00:00"
+    },
+    {
+      "id": "DOC-005",
+      "filename": "documents/docx/document_005_en_table.docx",
+      "format": "docx",
+      "language": "en",
+      "expected": {
+        "length_class": "medium",
+        "document_type": "report",
+        "structural_features": [
+          "headings",
+          "paragraphs",
+          "table",
+          "list"
+        ]
+      },
+      "started_at": "2026-08-26T07:00:01.699301+00:00",
+      "upload": {
+        "passed": true,
+        "document_id": "f0746c84-448e-455f-b3a7-c247fae89fab",
+        "run_id": "22aaa0a1-e0f6-4f49-8180-7fa0b1675813",
+        "status": "pending"
+      },
+      "initial_run": {
+        "status": "pending",
+        "current_stage": "extract_text",
+        "error": null
+      },
+      "resume": {
+        "passed": true,
+        "status": "awaiting_review",
+        "current_stage": "review",
+        "error": null
+      },
+      "run": {
+        "passed": true,
+        "status": "awaiting_review",
+        "current_stage": "review",
+        "error": null,
+        "stages": {
+          "analyze": {
+            "status": "completed",
+            "error": null
+          },
+          "extract_text": {
+            "status": "completed",
+            "error": null
+          }
+        }
+      },
+      "findings": {
+        "passed": true,
+        "count": 1,
+        "items": [
+          {
+            "status": "pending",
+            "evidence": [
+              "sample.pdf:page=1"
+            ],
+            "finding_id": "F-001",
+            "description": "Sample finding"
+          }
+        ]
+      },
+      "review": {
+        "required": true,
+        "automated": false,
+        "note": "Findings were intentionally not auto-approved. Human review remains a separate workflow step."
+      },
+      "passed": true,
+      "completed_at": "2026-08-26T07:00:01.773893+00:00"
+    },
+    {
+      "id": "DOC-014",
+      "filename": "documents/txt/document_014_en.txt",
+      "format": "txt",
+      "language": "en",
+      "expected": {
+        "length_class": "short",
+        "document_type": "plain_text",
+        "structural_features": [
+          "paragraphs"
+        ]
+      },
+      "started_at": "2026-08-26T07:00:01.774054+00:00",
+      "upload": {
+        "passed": true,
+        "document_id": "bc37368e-fbb8-4c72-abd2-cad3213ea5f3",
+        "run_id": "5795511d-93e5-4ae5-b9d6-624ae0b6e4a2",
+        "status": "pending"
+      },
+      "initial_run": {
+        "status": "pending",
+        "current_stage": "extract_text",
+        "error": null
+      },
+      "resume": {
+        "passed": true,
+        "status": "awaiting_review",
+        "current_stage": "review",
+        "error": null
+      },
+      "run": {
+        "passed": true,
+        "status": "awaiting_review",
+        "current_stage": "review",
+        "error": null,
+        "stages": {
+          "analyze": {
+            "status": "completed",
+            "error": null
+          },
+          "extract_text": {
+            "status": "completed",
+            "error": null
+          }
+        }
+      },
+      "findings": {
+        "passed": true,
+        "count": 1,
+        "items": [
+          {
+            "status": "pending",
+            "evidence": [
+              "sample.pdf:page=1"
+            ],
+            "finding_id": "F-001",
+            "description": "Sample finding"
+          }
+        ]
+      },
+      "review": {
+        "required": true,
+        "automated": false,
+        "note": "Findings were intentionally not auto-approved. Human review remains a separate workflow step."
+      },
+      "passed": true,
+      "completed_at": "2026-08-26T07:00:01.858441+00:00"
+    }
+  ],
+  "completed_at": "2026-08-26T07:00:01.858504+00:00",
+  "passed": true
+}
