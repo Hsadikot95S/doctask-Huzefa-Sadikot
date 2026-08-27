@@ -28,3 +28,7 @@ data/*.db
 
 # OS
 .DS_Store
+
+
+# Local corpus evaluation artifacts
+data/corpus-evaluations/
