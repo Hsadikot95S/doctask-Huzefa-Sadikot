@@ -78,6 +78,25 @@ later if scale requires it.
 
 ------------------------------------------------------------------------
 
+## Reproducible Setup
+
+Python dependencies are pinned in `requirements.txt`. The repository was
+validated by installing these dependencies in a clean Python virtual
+environment; the complete automated test suite passes in that environment.
+
+Typical setup:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pytest -q
+```
+
+The PostgreSQL connection uses the `postgresql+psycopg` SQLAlchemy dialect.
+`psycopg[binary]` is specified so a clean environment does not require a
+separately installed system `libpq`.
+
 # Implementation Stages
 
 ## Stage 1 --- Core Agentic Workflow
@@ -559,24 +578,6 @@ Awaiting Review
        Complete
 ```
 
-The completed run is reflected consistently across the UI:
-
-``` text
-Status:        COMPLETED
-Current stage: Complete
-
-Extract        ✓ Completed
-Analyze        ✓ Completed
-Review         ✓ Completed
-Complete       ✓ Completed
-
-Finding        APPROVED
-Evidence       sample.pdf:page=1
-```
-
-The browser therefore demonstrates the complete human-in-the-loop path
-against durable backend state rather than a mocked frontend state.
-
 ## Observability
 
 Execution is measured stage by stage:
@@ -599,49 +600,120 @@ How many tokens were used?
 What did the run cost?
 ```
 
-# Testing & Production Guarantees
+# Public Golden Corpus
 
-Tests focus on the behaviors that matter rather than only mocking
-internal functions.
+The repository includes a **Public Golden Corpus** used to validate the
+document-processing and analysis workflow against a deterministic,
+reviewable set of public documents.
 
-``` text
-Unit tests
-Integration tests
-Workflow tests
-Restart/recovery tests
-Concurrency tests
-Incremental-update tests
-Review tests
-Prompt-injection tests
+The corpus contains:
+
+- **15 documents**
+- **15 corresponding annotations**
+- **15/15 licence records verified**
+- PDF, DOCX, TXT, HTML and Markdown formats
+- English, Hindi, Spanish, French, German and Japanese
+- short, medium and long documents
+- structural coverage including paragraphs, headings, lists, tables, images
+  and code
+
+The corpus is organized by format and keeps annotations separate from the
+source documents:
+
+```text
+data/documents/public-golden-corpus/
+├── annotations/
+├── documents/
+│   ├── pdf/
+│   ├── docx/
+│   ├── txt/
+│   ├── html/
+│   └── markdown/
+├── scripts/
+│   └── validate_corpus.py
+├── test_sets/
+│   ├── smoke.json
+│   ├── multilingual.json
+│   ├── structural.json
+│   ├── full.json
+│   └── unsupported.json
+├── CORPUS_MATRIX.md
+├── MANIFEST.json
+├── LICENSE
+├── LICENSES.md
+└── README.md
 ```
 
-Important production scenarios:
+### Corpus validation
 
-``` text
-✓ run executes end-to-end
-✓ run reaches human review
-✓ finding can be approved independently
-✓ finding can be rejected independently
-✓ failure is persisted
-✓ worker can be killed and restarted
-✓ completed stages are not replayed
-✓ two runs can execute concurrently
-✓ same document can be processed concurrently without corruption
-✓ incremental update preserves existing findings
-✓ new findings remain pending until review
-✓ malicious document instructions remain data
-✓ tests run without a live paid model key
+The canonical corpus validator reports:
+
+```text
+Public Golden Corpus Validation
+================================
+Documents:           15
+Annotations:         15
+Licences verified:   15/15
+Formats:             docx, html, markdown, pdf, txt
+Languages:           de, en, es, fr, hi, ja
+Lengths:             long, medium, short
+Features:            code, headings, image, list, paragraphs, table
+RESULT: PASS
 ```
 
-The current implementation has **50 automated tests passing**, with the
-Stage 5 React frontend also validated through a production-style build
-and end-to-end human-review flow.
+Validation is reproducible with:
 
-The strongest tests validate actual system behavior, including restart,
-concurrency, review, incremental updates, and prompt-injection
-isolation.
+```bash
+python3 data/documents/public-golden-corpus/scripts/validate_corpus.py
+```
 
-------------------------------------------------------------------------
+### Corpus evaluation suites
+
+The corpus is exercised through the actual SuperDocs API rather than only
+through parser-level fixtures.
+
+Available deterministic suites:
+
+| Suite | Purpose | Result |
+|---|---|---|
+| `smoke` | Fast PDF/DOCX/TXT API sanity check | **PASS** |
+| `multilingual` | Supported documents across represented languages | **PASS** |
+| `structural` | Tables, lists, headings, images, code and other structure | **PASS** |
+| `full` | Complete supported-format corpus evaluation | **PASS** |
+| `unsupported` | Graceful handling of HTML/Markdown outside the current parser contract | Available |
+
+The API evaluation verifies the real workflow path:
+
+```text
+Corpus document
+      ↓
+POST /documents
+      ↓
+Analysis run
+      ↓
+Durable run state
+      ↓
+Findings + evidence
+      ↓
+React human review
+      ↓
+Approve / Reject
+```
+
+The smoke evaluation, for example, successfully processed PDF, DOCX and TXT
+documents, produced durable runs in `awaiting_review`, returned findings, and
+then exposed those runs through the React review workflow.
+
+Generated local evaluation output is intentionally excluded from version
+control via:
+
+```text
+data/corpus-evaluations/
+```
+
+The reusable corpus manifests, annotations, validator and test definitions
+remain part of the repository.
+
 
 # Key Engineering Decisions
 
@@ -687,36 +759,6 @@ isolation.
 
 ------------------------------------------------------------------------
 
-# Production Principles
-
-The implementation follows these invariants:
-
-1.  **Durable state lives outside the worker process.**
-2.  **Completed stages are not unnecessarily replayed.**
-3.  **A worker cannot execute a run it does not own.**
-4.  **AI proposals do not bypass human review.**
-5.  **Incremental updates preserve unaffected existing state.**
-6.  **Concurrent runs remain isolated.**
-7.  **Documents are data, never workflow commands.**
-8.  **Findings require evidence.**
-9.  **Failure is persisted, not hidden behind an API response.**
-10. **Every successful state means what it claims to mean.**
-11. **Execution cost and latency are measurable.**
-12. **The system can be tested without a live model key.**
-
-------------------------------------------------------------------------
-
-# Status
-
-  Stage                                           Status
-  ----------------------------------------------- -------------
-  Stage 1 --- Core Agentic Workflow               ✅ Complete
-  Stage 2 --- Durable Execution                   ✅ Complete
-  Stage 3 --- Incremental Updates                 ✅ Complete
-  Stage 4 --- Reliability & Safety                ✅ Complete
-  Stage 5 --- Production Interfaces / Hardening   ✅ Complete
-
-------------------------------------------------------------------------
 
 ## Core Principle
 
